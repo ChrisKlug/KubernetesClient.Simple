@@ -4,7 +4,7 @@ namespace KubernetesClient.Simple.Models.Pods
 {
     public class NodeSelectorTerm
     {
-        public IList<NodeSelectorRequirement> MatchExpressions { get; set; }
-        public IList<NodeSelectorRequirement> MatchFields { get; set; }
+        public IList<SelectorRequirement> MatchExpressions { get; set; }
+        public IList<SelectorRequirement> MatchFields { get; set; }
     }
 }

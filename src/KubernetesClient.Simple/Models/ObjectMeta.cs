@@ -7,7 +7,7 @@ namespace KubernetesClient.Simple.Models
     {
         public string ResourceVersion { get; set; }
         public IList<OwnerReference> OwnerReferences { get; set; }
-        public string NamespaceProperty { get; set; }
+        public string Namespace { get; set; }
         public string Name { get; set; }
         public IList<ManagedFieldsEntry> ManagedFields { get; set; }
         public IDictionary<string, string> Labels { get; set; }

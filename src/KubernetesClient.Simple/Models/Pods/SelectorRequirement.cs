@@ -2,10 +2,10 @@
 
 namespace KubernetesClient.Simple.Models.Pods
 {
-    public class LabelSelectorRequirement
+    public class SelectorRequirement
     {
         public string Key { get; set; }
-        public string OperatorProperty { get; set; }
+        public string Operator { get; set; }
         public IList<string> Values { get; set; }
     }
 }
