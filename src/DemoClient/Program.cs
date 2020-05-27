@@ -1,4 +1,5 @@
 ﻿using DemoClient.CustomResource;
+using k8s;
 using KubernetesClient.Simple;
 using KubernetesClient.Simple.v1_15.Models;
 using System;
@@ -15,9 +16,13 @@ namespace DemoClient
 
             var pods = await client.List<Pod>("docker");
 
-            var pods2 = await client.ListRaw<Pod>("default");
+            var pods2 = await client.ListRaw<Pod>("docker");
 
-            var dockerPod = await client.Get<Pod>("docker", pods.First().Metadata.Name);
+            var allPods = await client.List<Pod>();
+
+            var allPods2 = await client.ListRaw<Pod>();
+
+            var dockerPod = await client.Get<Pod>("docker", pods.Items.First().Metadata.Name);
 
             var foo = await client.Get<Foo>("default", "a-foo");
 

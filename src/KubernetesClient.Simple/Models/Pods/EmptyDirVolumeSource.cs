@@ -1,4 +1,6 @@
-﻿namespace KubernetesClient.Simple.Models.Pods
+﻿using k8s.Models;
+
+namespace KubernetesClient.Simple.Models.Pods
 {
     public class EmptyDirVolumeSource
     {

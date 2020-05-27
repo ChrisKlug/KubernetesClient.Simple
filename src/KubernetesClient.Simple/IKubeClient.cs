@@ -8,9 +8,10 @@ namespace KubernetesClient.Simple
     {
         Task<T> Get<T>(string name);
         Task<T> Get<T>(string @namespace, string name);
-        Task<IEnumerable<T>> ListAll<T>();
-        Task<IEnumerable<T>> List<T>(string @namespace);
-        Task<ResourceList<T>> ListRaw<T>();
-        Task<ResourceList<T>> ListRaw<T>(string @namespace);
+        
+        // TODO: Add extension method with IAsyncEnumerable
+        Task<(IEnumerable<T> Items, string ContinuationToken)> List<T>(string @namespace = null, string continuationToken = null);
+        
+        Task<ResourceList<T>> ListRaw<T>(string @namespace = null, string continuationToken = null);
     }
 }

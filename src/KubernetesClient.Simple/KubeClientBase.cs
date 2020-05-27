@@ -1,4 +1,5 @@
-﻿using KubernetesClient.Simple.Infrastructure;
+﻿using KubernetesClient.Simple.Exceptions;
+using KubernetesClient.Simple.Infrastructure;
 using KubernetesClient.Simple.Models;
 using Newtonsoft.Json;
 using System;
@@ -17,8 +18,10 @@ namespace KubernetesClient.Simple
         protected readonly IRequestCredentialsProvider RequestCredentialsProvider;
         protected readonly IResourceDefinitionRepository ResourceDefinitionRepository;
 
-        protected KubeClientBase(IUrlGenerator urlGenerator, IHttpClientAccessor httpClientAccessor, 
-                                IRequestCredentialsProvider requestCredentialsProvider, IResourceDefinitionRepository resourceDefinitionRepository)
+        protected KubeClientBase(IUrlGenerator urlGenerator, 
+                                IHttpClientAccessor httpClientAccessor, 
+                                IRequestCredentialsProvider requestCredentialsProvider, 
+                                IResourceDefinitionRepository resourceDefinitionRepository)
         {
             UrlGenerator = urlGenerator;
             HttpClientAccessor = httpClientAccessor;
@@ -26,14 +29,11 @@ namespace KubernetesClient.Simple
             ResourceDefinitionRepository = resourceDefinitionRepository;
         }
 
-        public Task<T> Get<T>(string name)
+        public async Task<T> Get<T>(string name)
         {
-            throw new NotImplementedException();
-        }
-        public async Task<T> Get<T>(string @namespace, string name)
-        {
-            var resourceDefinition = ResourceDefinitionRepository.GetDefinition(typeof(T));
-            var response = await MakeRequest(HttpMethod.Get, resourceDefinition, @namespace, name, CancellationToken.None);
+            var resourceDefinition = GetResourceDefinition<T>(ResourceScope.Cluster);
+            var req = new RequestSpec(HttpMethod.Get, resourceDefinition) { Name = name };
+            var response = await MakeRequest(req, CancellationToken.None);
             if (response.HttpStatusCode != HttpStatusCode.OK)
             {
                 return default;
@@ -41,23 +41,36 @@ namespace KubernetesClient.Simple
 
             return JsonConvert.DeserializeObject<T>(response.Content);
         }
-        public Task<IEnumerable<T>> ListAll<T>()
+        public async Task<T> Get<T>(string @namespace, string name)
         {
-            throw new NotImplementedException();
+            var resourceDefinition = GetResourceDefinition<T>(ResourceScope.Namespace);
+            var req = new RequestSpec(HttpMethod.Get, resourceDefinition) { Namespace = @namespace, Name = name };
+            var response = await MakeRequest(req, CancellationToken.None);
+            if (response.HttpStatusCode != HttpStatusCode.OK)
+            {
+                return default;
+            }
+
+            return JsonConvert.DeserializeObject<T>(response.Content);
         }
-        public async Task<IEnumerable<T>> List<T>(string @namespace)
+
+        public async Task<(IEnumerable<T> Items, string ContinuationToken)> List<T>(string @namespace = null, string continuationToken = null)
         {
-            var list = await ListRaw<T>(@namespace);
-            return list != null ? list.Items : null;
+            var list = await ListRaw<T>(@namespace, continuationToken);
+            return list != null ? ( list.Items, ContinuationToken: list.Metadata.ContinueProperty) : default;
         }
-        public Task<ResourceList<T>> ListRaw<T>()
-        {
-            throw new NotImplementedException();
-        }
-        public async Task<ResourceList<T>> ListRaw<T>(string @namespace)
+
+        public async Task<ResourceList<T>> ListRaw<T>(string @namespace = null, string continuationToken = null)
         {
             var resourceDefinition = ResourceDefinitionRepository.GetDefinition(typeof(T));
-            var response = await MakeRequest(HttpMethod.Get, resourceDefinition, @namespace, null, CancellationToken.None);
+            var req = new RequestSpec(HttpMethod.Get, resourceDefinition) { Namespace = @namespace };
+
+            if (!string.IsNullOrWhiteSpace(continuationToken))
+            {
+                req.QueryParams.Add("continue", continuationToken);
+            }
+
+            var response = await MakeRequest(req, CancellationToken.None);
             if (response.HttpStatusCode != HttpStatusCode.OK)
             {
                 return null;
@@ -66,11 +79,28 @@ namespace KubernetesClient.Simple
             return JsonConvert.DeserializeObject<ResourceList<T>>(response.Content);
         }
 
-        protected async Task<(HttpStatusCode HttpStatusCode, string Content)> MakeRequest(HttpMethod method, IKubernetesResourceDefinition resourceDefinition, string @namespace, string name, CancellationToken cancellationToken)
+        protected virtual IKubernetesResourceDefinition GetResourceDefinition<T>(ResourceScope expectedScope)
         {
-            var uri = UrlGenerator.GetUri(resourceDefinition, @namespace, name);
+            var resourceDefinition = ResourceDefinitionRepository.GetDefinition(typeof(T));
+            if (resourceDefinition.Scope != expectedScope)
+            {
+                var message = expectedScope == ResourceScope.Cluster ? 
+                                                "Cannot get a namespaced resource without a namespace" :
+                                                "Cannot get a non-namespaced resource through a namespace";
+                throw new InvalidScopeException(message);
 
-            var httpRequest = new HttpRequestMessage(method, uri);
+            }
+            return resourceDefinition;
+        }
+        protected abstract void EnsureResourceDefinitionSupport(IKubernetesResourceDefinition resourceDefinition);
+
+        protected async Task<(HttpStatusCode HttpStatusCode, string Content)> MakeRequest(RequestSpec req, CancellationToken cancellationToken)
+        {
+            EnsureResourceDefinitionSupport(req.ResourceDefinition);
+
+            var uri = UrlGenerator.GetUri(req.ResourceDefinition, req.Namespace, req.Name, req.QueryParams);
+
+            var httpRequest = new HttpRequestMessage(req.Method, uri);
 
             cancellationToken.ThrowIfCancellationRequested();
             await RequestCredentialsProvider.ProcessHttpRequestMessage(httpRequest);
@@ -86,6 +116,21 @@ namespace KubernetesClient.Simple
             httpResponse.Dispose();
 
             return (HttpStatusCode: statusCode, Content: content);
+        }
+
+        protected class RequestSpec 
+        {
+            public RequestSpec(HttpMethod method, IKubernetesResourceDefinition resourceDefinition)
+            {
+                Method = method;
+                ResourceDefinition = resourceDefinition;
+            }
+
+            public HttpMethod Method { get; }
+            public IKubernetesResourceDefinition ResourceDefinition { get; }
+            public string Namespace { get; set; }
+            public string Name { get; set; }
+            public Dictionary<string, string> QueryParams { get; set; } = new Dictionary<string, string>();
         }
     }
 }

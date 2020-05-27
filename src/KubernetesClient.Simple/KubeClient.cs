@@ -22,18 +22,12 @@ namespace KubernetesClient.Simple
             var kubernetes = new Kubernetes(config);
             return Create(kubernetesVersion, kubernetes);
         }
-        public static IKubeClient Create(KubernetesVersion kubernetesVersion, IKubernetes kubernetes)
+        public static IKubeClient Create(KubernetesVersion kubernetesVersion, Kubernetes kubernetes)
         {
-            IHttpClientAccessor httpClientAccessor = null;
-            IRequestCredentialsProvider requestCredentialsProvider = null;
             IUrlGenerator urlGenerator = new DefaultUrlGenerator(kubernetes.BaseUri);
             IResourceDefinitionRepository resourceDefinitionRepository = new ResourceDefinitionRepository();
-
-            if (kubernetes is Kubernetes kube)
-            {
-                httpClientAccessor = new KubernetesHttpClientAccessor(kube);
-                requestCredentialsProvider = new KubernetesRequestCredentialsProvider(kube);
-            }
+            IHttpClientAccessor httpClientAccessor = new KubernetesHttpClientAccessor(kubernetes);
+            IRequestCredentialsProvider requestCredentialsProvider = new KubernetesRequestCredentialsProvider(kubernetes);
 
             return kubernetesVersion switch
             {
