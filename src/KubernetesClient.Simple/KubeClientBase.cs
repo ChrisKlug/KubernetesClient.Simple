@@ -1,6 +1,7 @@
 ﻿using KubernetesClient.Simple.Exceptions;
 using KubernetesClient.Simple.Infrastructure;
 using KubernetesClient.Simple.Models;
+using Microsoft.AspNetCore.JsonPatch;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -59,7 +60,6 @@ namespace KubernetesClient.Simple
             var list = await ListRaw<T>(@namespace, continuationToken);
             return list != null ? ( list.Items, ContinuationToken: list.Metadata.ContinueProperty) : default;
         }
-
         public async Task<ResourceList<T>> ListRaw<T>(string @namespace = null, string continuationToken = null)
         {
             var resourceDefinition = ResourceDefinitionRepository.GetDefinition(typeof(T));
@@ -77,6 +77,17 @@ namespace KubernetesClient.Simple
             }
 
             return JsonConvert.DeserializeObject<ResourceList<T>>(response.Content);
+        }
+        public Task<T> Patch<T>(T resource, Action<T, JsonPatchDocument<T>> patchAction) where T: class
+        {
+            var patch = new JsonPatchDocument<T>();
+            patchAction(resource, patch);
+            patch.Operations.ForEach(x => x.path = x.path.ToLower());
+
+            //TODO: Send Patch to server
+            // var response = await _kubernetes.PatchNamespacedCustomObjectAsync(new V1Patch(patch), Foo.Group, Foo.Version, "default", Foo.Plural, foo.Metadata.Name);
+
+            return resource;
         }
 
         protected virtual IKubernetesResourceDefinition GetResourceDefinition<T>(ResourceScope expectedScope)

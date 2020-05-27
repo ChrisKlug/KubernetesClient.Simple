@@ -26,6 +26,11 @@ namespace DemoClient
 
             var foo = await client.Get<Foo>("default", "a-foo");
 
+            await client.Patch(pods.Items.First(), (resource, patch) => {
+                resource.Metadata.Annotations.Add("key", "value");
+                patch.Replace(x => x.Metadata.Annotations, foo.Metadata.Annotations);
+            });
+
             Console.ReadKey();
         }
     }
